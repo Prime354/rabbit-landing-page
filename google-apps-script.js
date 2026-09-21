@@ -79,13 +79,34 @@ function logToSheet(type, name, email, details, slotOrDate, status) {
       Logger.log("Notice: Google Sheet not connected. Skipping sheet logging.");
       return false;
     }
+
+    var safeName = name || "Anonymous";
+    var safeEmail = email || "N/A";
+    var safeDetails = details || "";
+
+    // De-duplication check: prevent duplicate row if identical submission received
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      try {
+        var lastRowData = sheet.getRange(lastRow, 3, 1, 3).getValues()[0]; // Columns: Name, Email, Details
+        if (String(lastRowData[0]) === safeName &&
+            String(lastRowData[1]) === safeEmail &&
+            String(lastRowData[2]) === safeDetails) {
+          Logger.log("Duplicate entry detected and prevented for: " + safeEmail);
+          return true; // Handled cleanly without duplicate insertion
+        }
+      } catch (dedupErr) {
+        Logger.log("Dedup check error: " + dedupErr.toString());
+      }
+    }
+
     var timestamp = new Date().toLocaleString();
     sheet.appendRow([
       timestamp,
       type || "Inquiry",
-      name || "Anonymous",
-      email || "N/A",
-      details || "",
+      safeName,
+      safeEmail,
+      safeDetails,
       slotOrDate || "N/A",
       status || "New"
     ]);

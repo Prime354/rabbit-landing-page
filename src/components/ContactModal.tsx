@@ -150,7 +150,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
   };
 
-  // Resilient endpoint poster (POST with GET fallback)
+  // Single resilient endpoint poster (Strictly ONE request per submission)
   const sendToEndpoint = async (url: string, params: URLSearchParams) => {
     if (!url || !url.startsWith('http')) return;
     try {
@@ -162,18 +162,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         },
         body: params.toString(),
       });
-      const fallbackUrl = `${url}?${params.toString()}`;
-      fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
     } catch {
-      const fallbackUrl = `${url}?${params.toString()}`;
-      await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
+      // Only execute fallback if POST completely failed
+      try {
+        const fallbackUrl = `${url}?${params.toString()}`;
+        await fetch(fallbackUrl, { mode: 'no-cors' });
+      } catch (err) {
+        console.warn('Endpoint delivery error:', err);
+      }
     }
   };
 
   // Confirm booking: Creates Google Calendar event & logs into Google Sheet
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSlot) return;
+    if (!selectedSlot || isBookingSubmitting) return;
 
     setIsBookingSubmitting(true);
     const selectedDay = upcomingDays[selectedDateIndex];
@@ -182,9 +185,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     params.append('action', 'book');
     params.append('slot', selectedSlot);
     params.append('date', selectedDay.fullDate.toISOString());
-    params.append('name', bookingDetails.name);
-    params.append('email', bookingDetails.email);
-    params.append('notes', bookingDetails.notes || 'Design Consultation');
+    params.append('name', bookingDetails.name.trim());
+    params.append('email', bookingDetails.email.trim());
+    params.append('notes', bookingDetails.notes.trim() || 'Design Consultation');
 
     // 1. Send to Google Calendar endpoint (creates meeting & Meet link)
     if (calendarBackendUrl) {
@@ -192,7 +195,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     }
     // 2. Also send to Google Sheet endpoint if configured and separate
     if (sheetBackendUrl && sheetBackendUrl !== calendarBackendUrl) {
-      sendToEndpoint(sheetBackendUrl, params);
+      await sendToEndpoint(sheetBackendUrl, params);
     }
 
     setIsBookingSubmitting(false);
@@ -205,25 +208,23 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     });
   };
 
-  // Direct Message submit: Logs directly into Google Sheet
+  // Direct Message submit: Logs directly into Google Sheet (single entry)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isMessageSubmitting) return;
+
     setIsMessageSubmitting(true);
 
     const params = new URLSearchParams();
     params.append('action', 'message');
-    params.append('name', directMessage.name);
-    params.append('email', directMessage.email);
-    params.append('message', directMessage.message);
+    params.append('name', directMessage.name.trim());
+    params.append('email', directMessage.email.trim());
+    params.append('message', directMessage.message.trim());
     params.append('timestamp', new Date().toISOString());
 
-    // 1. Send to Google Sheet endpoint
+    // Send single submission to Google Sheet endpoint
     if (sheetBackendUrl) {
       await sendToEndpoint(sheetBackendUrl, params);
-    }
-    // 2. Also forward to Calendar backend if separate
-    if (calendarBackendUrl && calendarBackendUrl !== sheetBackendUrl) {
-      sendToEndpoint(calendarBackendUrl, params);
     }
 
     setIsMessageSubmitting(false);
