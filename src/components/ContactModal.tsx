@@ -59,7 +59,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
   // Google Sheet Backend URL (for direct message form submissions & CRM logging)
   const DEFAULT_SHEET_BACKEND_URL =
-    'https://script.google.com/macros/s/AKfycbwkIiDrEca1zQTQS9CDoCq0tlPPIr62XjCgBhIUw3QVMqa-8H-uhw8BD-aZs6lH24KsjA/exec';
+    'https://script.google.com/macros/s/AKfycbybU7ApnWYpQKbl-Atyd0v0Dw6uZvWMcg1Os4tb6wXxJwyughy6PjfQbPMFI6XUrAmnKQ/exec';
   const sheetBackendUrl =
     import.meta.env.VITE_GOOGLE_SHEET_URL || DEFAULT_SHEET_BACKEND_URL;
 
