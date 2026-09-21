@@ -52,7 +52,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
   // Google Calendar Backend URL (default fallback points to user's web app)
   const DEFAULT_CALENDAR_BACKEND_URL =
-    'https://script.google.com/macros/s/AKfycbykPbgRc8obdt0ELtzXjqo_D4pMZt5-IJesq0dRn2vsHBqM3LN9TAxxt-SWkJLmcEOJjw/exec';
+    'https://script.google.com/macros/s/AKfycbxaYQmj4B5jVnbm9gny9apU-9k0k78orwcbDoXht2yJxcmvtVFrgVqCCBaRs6SCUfyv/exec';
   const calendarBackendUrl =
     import.meta.env.VITE_GOOGLE_CALENDAR_BACKEND_URL ||
     import.meta.env.VITE_GOOGLE_SHEET_URL ||

@@ -32,7 +32,7 @@ function getAvailableSlots(dateStr) {
   // Get all events already on your calendar for that day
   var existingEvents = cal.getEvents(startOfDay, endOfDay);
 
-  var slots = DEFAULT_WORKING_SLOTS.map(function(slotTime) {
+  var slots = DEFAULT_WORKING_SLOTS.map(function (slotTime) {
     var parts = slotTime.split(" ");
     var timeParts = parts[0].split(":");
     var hour = parseInt(timeParts[0], 10);
@@ -44,7 +44,7 @@ function getAvailableSlots(dateStr) {
     var slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000); // 30 mins
 
     // Mark as booked if any calendar event overlaps with this slot
-    var isBusy = existingEvents.some(function(event) {
+    var isBusy = existingEvents.some(function (event) {
       return (event.getStartTime() < slotEnd && event.getEndTime() > slotStart);
     });
 
@@ -102,7 +102,7 @@ function doPost(e) {
   try {
     var p = (e && e.parameter) ? e.parameter : {};
     if ((!p.name && !p.slot) && e && e.postData && e.postData.contents) {
-      try { p = JSON.parse(e.postData.contents); } catch (err) {}
+      try { p = JSON.parse(e.postData.contents); } catch (err) { }
     }
 
     var result = createCalendarAppointment(p);
