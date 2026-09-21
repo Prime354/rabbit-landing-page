@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  background-color: #1A0C05;
+  color: #FFF1EB;
+  font-family: 'Kanit', sans-serif;
+  scroll-behavior: smooth;
+}
+
+/* Hero Heading Gradient Class (Warm Orange to Crisp White) */
+.hero-heading {
+  background: linear-gradient(180deg, #FF9C66 0%, #FFFFFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A0C05;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3B1B0D;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5E2A12;
+}
+
+/* Contact Button Custom Styling (Carrot & Rabbit Theme) */
+.contact-pill-btn {
+  background: linear-gradient(123deg, #7A2805 7%, #D84A07 37%, #FF6B1A 72%, #22C55E 100%);
+  box-shadow: 0px 4px 4px rgba(216, 74, 7, 0.35), 4px 4px 12px #FF8838 inset;
+  outline: 2px solid white;
+  outline-offset: -3px;
+  transition: transform 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease;
+}
+
+.contact-pill-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.1);
+  box-shadow: 0px 8px 18px rgba(255, 107, 26, 0.45), 4px 4px 14px #FF8838 inset;
+}
+
+.contact-pill-btn:active {
+  transform: translateY(0px) scale(0.98);
+}
