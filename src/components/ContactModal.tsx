@@ -25,7 +25,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const googleSheetUrl = import.meta.env.VITE_GOOGLE_SHEET_URL || '';
+  const DEFAULT_GOOGLE_SHEET_URL =
+    'https://script.google.com/macros/s/AKfycbykPbgRc8obdt0ELtzXjqo_D4pMZt5-IJesq0dRn2vsHBqM3LN9TAxxt-SWkJLmcEOJjw/exec';
+  const googleSheetUrl = import.meta.env.VITE_GOOGLE_SHEET_URL || DEFAULT_GOOGLE_SHEET_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
