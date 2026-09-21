@@ -49,6 +49,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     message: '',
   });
   const [isMessageSent, setIsMessageSent] = useState(false);
+  const [isMessageSubmitting, setIsMessageSubmitting] = useState(false);
 
   // Google Calendar Backend URL (default fallback points to user's web app)
   const DEFAULT_CALENDAR_BACKEND_URL =
@@ -194,9 +195,42 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     });
   };
 
-  // Direct Message submit
-  const handleSendMessage = (e: React.FormEvent) => {
+  // Direct Message submit (Logs to Google Sheet via Apps Script backend)
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsMessageSubmitting(true);
+
+    if (calendarBackendUrl && calendarBackendUrl.startsWith('http')) {
+      const params = new URLSearchParams();
+      params.append('action', 'message');
+      params.append('name', directMessage.name);
+      params.append('email', directMessage.email);
+      params.append('message', directMessage.message);
+      params.append('timestamp', new Date().toISOString());
+
+      try {
+        await fetch(calendarBackendUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+
+        // Fallback GET to guarantee delivery across strict cross-origin/redirection policies
+        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
+        fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
+      } catch (err) {
+        console.warn('Inquiry submission error, attempting fallback:', err);
+        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
+        await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+
+    setIsMessageSubmitting(false);
     setIsMessageSent(true);
     confetti({
       particleCount: 80,
@@ -209,6 +243,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
   const handleReset = () => {
     setIsBookingSubmitted(false);
     setIsMessageSent(false);
+    setIsBookingSubmitting(false);
+    setIsMessageSubmitting(false);
     setBookingDetails({ name: '', email: '', notes: '' });
     setDirectMessage({ name: '', email: '', message: '' });
     onClose();
@@ -623,10 +659,20 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
                         <button
                           type="submit"
-                          className="w-full sm:w-auto contact-pill-btn px-8 py-3 rounded-full text-white font-medium uppercase text-xs tracking-widest inline-flex items-center justify-center gap-2 cursor-pointer"
+                          disabled={isMessageSubmitting}
+                          className="w-full sm:w-auto contact-pill-btn px-8 py-3 rounded-full text-white font-medium uppercase text-xs tracking-widest inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                         >
-                          <span>Send Message</span>
-                          <Send className="w-3.5 h-3.5" />
+                          {isMessageSubmitting ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Sending...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Send Message</span>
+                              <Send className="w-3.5 h-3.5" />
+                            </>
+                          )}
                         </button>
                       </div>
                     </form>
