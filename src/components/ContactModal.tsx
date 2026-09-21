@@ -51,13 +51,17 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
   const [isMessageSent, setIsMessageSent] = useState(false);
   const [isMessageSubmitting, setIsMessageSubmitting] = useState(false);
 
-  // Google Calendar Backend URL (default fallback points to user's web app)
+  // Google Calendar Backend URL (for real-time slots & Google Meet booking)
   const DEFAULT_CALENDAR_BACKEND_URL =
     'https://script.google.com/macros/s/AKfycbxaYQmj4B5jVnbm9gny9apU-9k0k78orwcbDoXht2yJxcmvtVFrgVqCCBaRs6SCUfyv/exec';
   const calendarBackendUrl =
-    import.meta.env.VITE_GOOGLE_CALENDAR_BACKEND_URL ||
-    import.meta.env.VITE_GOOGLE_SHEET_URL ||
-    DEFAULT_CALENDAR_BACKEND_URL;
+    import.meta.env.VITE_GOOGLE_CALENDAR_BACKEND_URL || DEFAULT_CALENDAR_BACKEND_URL;
+
+  // Google Sheet Backend URL (for direct message form submissions & CRM logging)
+  const DEFAULT_SHEET_BACKEND_URL =
+    'https://script.google.com/macros/s/AKfycbzZv4Tw6ZnI0Qa1gLR1gD6WWNogfNXeRqoh7X-apjLnCnGn8xlFQH_JobvEtQyd7oAxhw/exec';
+  const sheetBackendUrl =
+    import.meta.env.VITE_GOOGLE_SHEET_URL || DEFAULT_SHEET_BACKEND_URL;
 
   // Generate dynamic next 7 calendar days starting from tomorrow
   const upcomingDays = useMemo(() => {
@@ -146,7 +150,27 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
   };
 
-  // Confirm booking & create event directly on Google Calendar
+  // Resilient endpoint poster (POST with GET fallback)
+  const sendToEndpoint = async (url: string, params: URLSearchParams) => {
+    if (!url || !url.startsWith('http')) return;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+      const fallbackUrl = `${url}?${params.toString()}`;
+      fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
+    } catch {
+      const fallbackUrl = `${url}?${params.toString()}`;
+      await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
+    }
+  };
+
+  // Confirm booking: Creates Google Calendar event & logs into Google Sheet
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot) return;
@@ -154,35 +178,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     setIsBookingSubmitting(true);
     const selectedDay = upcomingDays[selectedDateIndex];
 
-    if (calendarBackendUrl && calendarBackendUrl.startsWith('http')) {
-      const params = new URLSearchParams();
-      params.append('action', 'book');
-      params.append('slot', selectedSlot);
-      params.append('date', selectedDay.fullDate.toISOString());
-      params.append('name', bookingDetails.name);
-      params.append('email', bookingDetails.email);
-      params.append('notes', bookingDetails.notes || 'Design Consultation');
+    const params = new URLSearchParams();
+    params.append('action', 'book');
+    params.append('slot', selectedSlot);
+    params.append('date', selectedDay.fullDate.toISOString());
+    params.append('name', bookingDetails.name);
+    params.append('email', bookingDetails.email);
+    params.append('notes', bookingDetails.notes || 'Design Consultation');
 
-      try {
-        await fetch(calendarBackendUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: params.toString(),
-        });
-
-        // Also trigger GET fallback to guarantee receipt
-        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
-        fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
-      } catch (err) {
-        console.warn('Booking POST error, sending fallback:', err);
-        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
-        await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
-      }
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+    // 1. Send to Google Calendar endpoint (creates meeting & Meet link)
+    if (calendarBackendUrl) {
+      await sendToEndpoint(calendarBackendUrl, params);
+    }
+    // 2. Also send to Google Sheet endpoint if configured and separate
+    if (sheetBackendUrl && sheetBackendUrl !== calendarBackendUrl) {
+      sendToEndpoint(sheetBackendUrl, params);
     }
 
     setIsBookingSubmitting(false);
@@ -195,39 +205,25 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     });
   };
 
-  // Direct Message submit (Logs to Google Sheet via Apps Script backend)
+  // Direct Message submit: Logs directly into Google Sheet
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsMessageSubmitting(true);
 
-    if (calendarBackendUrl && calendarBackendUrl.startsWith('http')) {
-      const params = new URLSearchParams();
-      params.append('action', 'message');
-      params.append('name', directMessage.name);
-      params.append('email', directMessage.email);
-      params.append('message', directMessage.message);
-      params.append('timestamp', new Date().toISOString());
+    const params = new URLSearchParams();
+    params.append('action', 'message');
+    params.append('name', directMessage.name);
+    params.append('email', directMessage.email);
+    params.append('message', directMessage.message);
+    params.append('timestamp', new Date().toISOString());
 
-      try {
-        await fetch(calendarBackendUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: params.toString(),
-        });
-
-        // Fallback GET to guarantee delivery across strict cross-origin/redirection policies
-        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
-        fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
-      } catch (err) {
-        console.warn('Inquiry submission error, attempting fallback:', err);
-        const fallbackUrl = `${calendarBackendUrl}?${params.toString()}`;
-        await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
-      }
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+    // 1. Send to Google Sheet endpoint
+    if (sheetBackendUrl) {
+      await sendToEndpoint(sheetBackendUrl, params);
+    }
+    // 2. Also forward to Calendar backend if separate
+    if (calendarBackendUrl && calendarBackendUrl !== sheetBackendUrl) {
+      sendToEndpoint(calendarBackendUrl, params);
     }
 
     setIsMessageSubmitting(false);
