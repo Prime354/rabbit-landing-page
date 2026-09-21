@@ -1,61 +1,62 @@
 /**
  * GOOGLE APPS SCRIPT FOR RABBIT LANDING PAGE
  * -------------------------------------------
- * This script receives form inquiries from your landing page and logs them into your Google Sheet.
  * 
- * HOW TO SET THIS UP (Takes 2 minutes):
- * 1. Open Google Sheets (https://sheets.new)
- * 2. In row 1, add these headers:
- *    A1: Timestamp | B1: Name | C1: Email | D1: Service | E1: Budget | F1: Message
- * 3. In the top menu, click Extensions > Apps Script
- * 4. Delete any code in the editor, and paste this entire file content.
- * 5. Click the blue "Deploy" button (top right) > "New deployment"
- * 6. Click the gear icon next to "Select type" > choose "Web app"
- * 7. Configure:
- *    - Description: Landing Page Inquiries
- *    - Execute as: Me (your Google account)
- *    - Who has access: Anyone (Important: so your website visitors can submit)
- * 8. Click "Deploy", copy the "Web app URL" (ends in /exec)
- * 9. Paste that URL into your `.env` file as:
- *    VITE_GOOGLE_SHEET_URL=https://script.google.com/macros/s/.../exec
+ * WHY DATA MIGHT NOT BE REFLECTING:
+ * 1. "Who has access" MUST be set to "Anyone" (NOT "Only myself").
+ *    - In Apps Script, click: Deploy > Manage deployments
+ *    - Click the pencil icon (Edit)
+ *    - Under "Who has access", change to: Anyone
+ *    - Click Deploy!
+ * 
+ * 2. FIRST-TIME AUTHORIZATION:
+ *    - Click "Run" on testSheet() below once to approve Google Drive & Sheet permissions.
  */
 
 function doPost(e) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var data = {};
     
-    if (e.postData && e.postData.contents) {
+    // Extract parameters from form submission
+    var p = (e && e.parameter) ? e.parameter : {};
+    
+    // Fallback if sent as JSON payload
+    if ((!p.name && !p.email) && e && e.postData && e.postData.contents) {
       try {
-        data = JSON.parse(e.postData.contents);
+        p = JSON.parse(e.postData.contents);
       } catch (err) {
-        data = e.parameter;
+        // keep p as is
       }
-    } else if (e.parameter) {
-      data = e.parameter;
     }
 
-    var timestamp = new Date();
-    var name = data.name || '';
-    var email = data.email || '';
-    var service = data.service || '';
-    var budget = data.budget || '';
-    var message = data.message || '';
+    var timestamp = p.timestamp || new Date().toLocaleString();
+    var name = p.name || 'Anonymous';
+    var email = p.email || 'No email provided';
+    var service = p.service || 'General';
+    var budget = p.budget || 'Not specified';
+    var message = p.message || '';
 
-    // Append row to the sheet
+    // Append the row to your Google Sheet
     sheet.appendRow([timestamp, name, email, service, budget, message]);
 
     return ContentService.createTextOutput(
-      JSON.stringify({ status: 'success', message: 'Row added successfully' })
+      JSON.stringify({ status: 'success', message: 'Row added' })
     ).setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
     return ContentService.createTextOutput(
-      JSON.stringify({ status: 'error', message: error.toString() })
+      JSON.stringify({ status: 'error', error: error.toString() })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput("Google Sheets Webhook is active and listening for POST requests.");
+  return ContentService.createTextOutput("Google Sheets Webhook is active! If you see this, your deployment is working properly.");
+}
+
+// Helper function: Run this inside Apps Script editor to authorize sheet permissions
+function testSheet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  sheet.appendRow([new Date().toLocaleString(), "Test Name", "test@domain.com", "Brand Identity", "$3k - $5k", "Test connection row"]);
+  Logger.log("Test row successfully added!");
 }
