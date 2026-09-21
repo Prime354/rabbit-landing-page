@@ -32,17 +32,16 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     setIsSubmitting(true);
 
     if (googleSheetUrl && googleSheetUrl.startsWith('http')) {
-      try {
-        // Send using URLSearchParams (application/x-www-form-urlencoded)
-        // This is natively parsed by Google Apps Script e.parameter with zero CORS issues
-        const params = new URLSearchParams();
-        params.append('name', formData.name);
-        params.append('email', formData.email);
-        params.append('service', formData.service);
-        params.append('budget', formData.budget);
-        params.append('message', formData.message);
-        params.append('timestamp', new Date().toLocaleString());
+      const params = new URLSearchParams();
+      params.append('name', formData.name);
+      params.append('email', formData.email);
+      params.append('service', formData.service);
+      params.append('budget', formData.budget);
+      params.append('message', formData.message);
+      params.append('timestamp', new Date().toLocaleString());
 
+      try {
+        // Send POST request
         await fetch(googleSheetUrl, {
           method: 'POST',
           mode: 'no-cors',
@@ -51,8 +50,14 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
           },
           body: params.toString(),
         });
+
+        // Also fire GET fallback to guarantee logging even if browser blocks redirected POST
+        const fallbackUrl = `${googleSheetUrl}?${params.toString()}`;
+        fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
       } catch (err) {
-        console.warn('Form submission encountered an error:', err);
+        console.warn('POST failed, attempting GET fallback:', err);
+        const fallbackUrl = `${googleSheetUrl}?${params.toString()}`;
+        await fetch(fallbackUrl, { mode: 'no-cors' }).catch(() => {});
       }
     } else {
       // Local fallback simulation if no URL configured
