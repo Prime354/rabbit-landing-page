@@ -79,17 +79,49 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     return days;
   }, []);
 
-  // Time slots per day
-  const slotsByDay: Slot[] = useMemo(() => {
-    return [
-      { time: '09:30 AM', isBooked: false },
-      { time: '11:00 AM', isBooked: false },
-      { time: '01:30 PM', isBooked: true }, // realistic booked state
-      { time: '03:00 PM', isBooked: false },
-      { time: '04:30 PM', isBooked: false },
-      { time: '06:00 PM', isBooked: false },
-    ];
-  }, []);
+  // Time slots per day - live from Google Calendar with fallback
+  const [liveSlots, setLiveSlots] = useState<Slot[]>([
+    { time: '09:30 AM', isBooked: false },
+    { time: '11:00 AM', isBooked: false },
+    { time: '01:30 PM', isBooked: true },
+    { time: '03:00 PM', isBooked: false },
+    { time: '04:30 PM', isBooked: false },
+    { time: '06:00 PM', isBooked: false },
+  ]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+  // Fetch live slots from Google Calendar backend when date changes
+  React.useEffect(() => {
+    const selectedDay = upcomingDays[selectedDateIndex];
+    if (!selectedDay || !googleSheetUrl) return;
+
+    let isMounted = true;
+    setIsLoadingSlots(true);
+
+    const dateQuery = encodeURIComponent(selectedDay.fullDate.toISOString());
+    fetch(`${googleSheetUrl}?action=getSlots&date=${dateQuery}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data.slots) && data.slots.length > 0) {
+          setLiveSlots(data.slots);
+          const currentSlotBooked = data.slots.find((s: Slot) => s.time === selectedSlot)?.isBooked;
+          if (currentSlotBooked) {
+            const firstAvailable = data.slots.find((s: Slot) => !s.isBooked);
+            if (firstAvailable) setSelectedSlot(firstAvailable.time);
+          }
+        }
+      })
+      .catch((err) => {
+        console.log('Using default slots (static fallback):', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingSlots(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDateIndex, googleSheetUrl, upcomingDays, selectedSlot]);
 
   // Client local timezone
   const userTimezone = useMemo(() => {
@@ -155,7 +187,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     });
   };
 
-  // Submit Appointment Booking
+  // Submit Appointment Booking into Google Calendar + Google Sheet backend
   const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot) return;
@@ -165,8 +197,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
     if (googleSheetUrl && googleSheetUrl.startsWith('http')) {
       const params = new URLSearchParams();
+      params.append('action', 'book');
+      params.append('slot', selectedSlot);
+      params.append('date', selectedDay.fullDate.toISOString());
       params.append('name', bookingDetails.name);
       params.append('email', bookingDetails.email);
+      params.append('notes', bookingDetails.notes || 'Discovery Consultation');
       params.append('service', `Appointment: ${selectedDay.formatted} @ ${selectedSlot}`);
       params.append('budget', 'Discovery Call (Free)');
       params.append('message', bookingDetails.notes || 'Booked via live slot scheduler');
@@ -416,14 +452,22 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                     {/* 2. Available Slots Grid */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-[11px] uppercase tracking-wider text-[#D8C6C0] font-bold">
-                          2. Available Time Slots ({upcomingDays[selectedDateIndex]?.formatted})
-                        </label>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] uppercase tracking-wider text-[#D8C6C0] font-bold">
+                            2. Available Time Slots ({upcomingDays[selectedDateIndex]?.formatted})
+                          </label>
+                          {isLoadingSlots && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-[#FFA526]">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              <span>Checking Calendar...</span>
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-[#A69087]">All slots 30 mins</span>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {slotsByDay.map((slot, idx) => {
+                        {liveSlots.map((slot, idx) => {
                           const isSelected = selectedSlot === slot.time && !slot.isBooked;
 
                           if (slot.isBooked) {
